@@ -77,3 +77,45 @@ data <- data %>%
   mutate_if(is.character, as.factor)
 str(data)
 ```
+
+#Plots
+
+``` {r plot}
+data %>%
+  group_by(Top.Genre) %>%
+  summarise(Avg_Popularity = mean(Popularity, na.rm = TRUE),
+            Count = n()) %>%
+  filter(Count > 20) %>%  # filter to more common genres
+  arrange(desc(Avg_Popularity)) %>%
+  top_n(10, Avg_Popularity) %>%
+  ggplot(aes(x = reorder(Top.Genre, Avg_Popularity), y = Avg_Popularity)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 Genres by Average Popularity",
+       x = "Genre", y = "Average Popularity")
+
+```
+
+``` {r}
+
+```
+
+``` {r}
+
+```
+
+``` {r}
+
+```
+
+``` {r}
+
+```
+
+``` {r}
+
+```
+
+``` {r}
+
+```
