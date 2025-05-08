@@ -1,30 +1,47 @@
 ---
 title: "Assignment 1"
-output: html_document
-date: "2025-05-08"
+Auther: Osaro Orebor, Calvin Boateng, Jair 
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    theme: united
+
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# Setting Libraries
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r Libraries}
-library(tidyr)
-library(readxl)
+```{r Libraries, message = FALSE, warning = FALSE}
+suppressWarnings({
+  library(dplyr)
+  library(ggplot2)
+  library(ggpubr)
+  library(kableExtra)
+  library(tidyverse)
+  library(readr)
+  library(knitr)
+  library(weathermetrics)
+  library(gridExtra)
+  library(plotly)
+  library(GGally)
+  library(magrittr)
+  library(regclass)
+  library(MASS)
+  library(pROC)
+  library(caret)
+  library(car)
+})
 ```
 
 ```{r set path}
-getwd()
 ```
-## Including Plots
+# Loading in the Data
 
-You can also embed plots, for example:
 
 ```{r loading in the file, echo=FALSE}
 data <- read.csv("data/Spotify-2000.csv")
@@ -32,5 +49,31 @@ data <- read.csv("data/Spotify-2000.csv")
 
 
 ```
+.
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+# Data Analysis 
+
+## looking at the data and analyse the variables used
+
+
+### Summary
+```{r Data summary, echo = FALSE}
+kable(head(data, 10)) %>% 
+  kable_styling("striped", full_width = F) %>% 
+  scroll_box(width = "800px", height = "500px")
+
+kable(tail(data, 10)) %>% 
+  kable_styling("striped", full_width = F) %>% 
+  scroll_box(width = "800px", height = "500px")
+
+str(data)
+```
+
+##Mutating Data
+
+``` {r}
+#mutate our data so character values become factors
+data <- data %>%
+  mutate_if(is.character, as.factor)
+str(data)
+```
