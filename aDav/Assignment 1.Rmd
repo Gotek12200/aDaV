@@ -74,7 +74,8 @@ str(data)
 ``` {r}
 #mutate our data so character values become factors
 data <- data %>%
-  mutate_if(is.character, as.factor)
+  mutate_if(is.character, as.factor) %>%
+  mutate(Length..Duration. = as.integer(Length..Duration.))
 str(data)
 ```
 
@@ -85,7 +86,7 @@ data %>%
   group_by(Top.Genre) %>%
   summarise(Avg_Popularity = mean(Popularity, na.rm = TRUE),
             Count = n()) %>%
-  filter(Count > 20) %>%  
+  filter(Count > 10) %>%  
   arrange(desc(Avg_Popularity)) %>%
   top_n(10, Avg_Popularity) %>%
   ggplot(aes(x = reorder(Top.Genre, Avg_Popularity), y = Avg_Popularity)) +
@@ -97,25 +98,141 @@ data %>%
 ```
 
 ``` {r}
+#impact of year of popularity. How much of the popularity is nostalgia
+
+data %>%
+  mutate(Demi.Decade = (Year %/% 5) * 5) %>%
+  group_by(Demi.Decade) %>%
+  summarise(Avg_Popularity = mean(Popularity, na.rm = TRUE)) %>%
+  ggplot(aes(x = Demi.Decade, y = Avg_Popularity)) +
+  geom_col()
+
+data %>%
+  group_by(Year) %>%
+  summarise(Avg_Popularity = mean(Popularity, na.rm = TRUE)) %>%
+  ggplot(aes(x = Year, y = Avg_Popularity)) +
+  geom_col()
+?group_by
+```
+
+``` {r}
+ggplot(data, aes(y = Popularity, x = Year)) +
+  geom_hex()
+
+
+  ?geom_hex
+```
+
+``` {r}
+# Doing a basic data partition. We might want to do k-fold cross validation later instead
+
+train_index <- createDataPartition(data$Popularity, p = .7, 
+                                  list = FALSE, 
+                                  times = 1)
+data_train <- data[train_index,]
+
+data_val_and_test <- data[-train_index,]
+
+val_index <- createDataPartition(data_val_and_test$Popularity, p = .66, 
+                                  list = FALSE, 
+                                  times = 1)
+
+data_valid <- data_val_and_test[val_index,]
+data_test  <- data_val_and_test[-val_index,]
+
+dataset_partitions <- data.frame(
+  "Dataset" = c("Full Dataset", "Validation and Test Set", "Training Set", "Validation Set", "Test Set"),
+  "N of Obs" = c(nrow(data), nrow(data_val_and_test), nrow(data_train), nrow(data_valid), nrow(data_test)),
+  "% Split" = c(
+    sprintf("%%%s", round(((nrow(data) / nrow(data))*100), 2)),
+    sprintf("%%%s", round(((nrow(data_val_and_test) / nrow(data))*100), 2)),
+    sprintf("%%%s", round(((nrow(data_train) / nrow(data))*100), 2)),
+    sprintf("%%%s", round(((nrow(data_valid) / nrow(data))*100), 2)),
+    sprintf("%%%s", round(((nrow(data_test) / nrow(data))*100), 2))
+  )
+)
+
+dataset_partitions %>%
+  kbl(caption = "Dataset Partitions") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+
+```
+
+
+``` {r}
+# Combine the datasets, adding a column to distinguish them
+combined_data <- bind_rows(
+  mutate(data_train, Set = "Training"),
+  mutate(data_valid, Set = "Validation"),
+  mutate(data_test, Set = "Test")
+)
+
+# Checking if the distribution of popularity is similar in the three datasets
+ggplot(combined_data, aes(x = Popularity, colour = Set)) +
+  geom_density(trim = T, linewidth = 1) +
+  labs(title = "Popularity Distribution Across Datasets",
+       x = "Popularity",
+       y = "Frequency") +
+  theme_minimal()
+```
+
+
+``` {r}
+# Creating/importing necessary functions
+
+generate_formulas <- function(p, x_vars, y_var) {
+  if (p %% 1 != 0)           stop("Input an integer n")
+  if (p > length(x_vars))    stop("p should be smaller than number of vars")
+  if (!is.character(x_vars)) stop("x_vars should be a character vector")
+  if (!is.character(y_var))  stop("y_vars should be character type")
+  apply(combn(x_vars, p), 2, function(vars) {
+    paste0(y_var, " ~ ", paste(vars, collapse = " + "))
+  })
+}
+
+lm_mse <- function(formula, train_data, valid_data) {
+  y_name <- as.character(formula)[2]
+  y_true <- valid_data[[y_name]]
+  
+  lm_fit <- lm(formula, train_data)
+  y_pred <- predict(lm_fit, newdata = valid_data)
+  
+  mean((y_true - y_pred)^2)
+}
 
 ```
 
 ``` {r}
+# I made a neat function for finding the best set of predictors
+pred_set <- function(pred_count, pred_names, out_name, train_data, valid_data) {
+  formulas <- generate_formulas(pred_count, pred_names, out_name)
+  mses <- rep(0, length(formulas))
+  for (i in 1:length(formulas)) { 
+    mses[i] <- lm_mse(as.formula(formulas[i]), train_data, valid_data)
+  }
+  list(
+    set = formulas[which.min(mses)],
+    mse = min(mses)
+  )
+}
 
-```
+# Testing for the best set of predictors without including year
 
-``` {r}
+pred_names <- setdiff(colnames(data), c("Index", "Title", "Artist", "Top.Genre", "Year", "Popularity"))
 
-```
 
-``` {r}
+pred_set(1, pred_names, "Popularity", data_train, data_valid)
+pred_set(2, pred_names, "Popularity", data_train, data_valid)
+pred_set(3, pred_names, "Popularity", data_train, data_valid)
+pred_set(4, pred_names, "Popularity", data_train, data_valid)
 
-```
+# Testing for the best set of predictors INCLUDING year
 
-``` {r}
+pred_names_y <- setdiff(colnames(data), c("Index", "Title", "Artist", "Top.Genre", "Popularity"))
 
-```
-
-``` {r}
+pred_set(1, pred_names_y, "Popularity", data_train, data_valid)
+pred_set(2, pred_names_y, "Popularity", data_train, data_valid)
+pred_set(3, pred_names_y, "Popularity", data_train, data_valid)
+pred_set(4, pred_names_y, "Popularity", data_train, data_valid)
 
 ```
