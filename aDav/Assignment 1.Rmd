@@ -1,14 +1,14 @@
 ---
 title: "Assignment 1"
-Auther: Osaro Orebor, Calvin Boateng, Jair 
+author: "Osaro Orebor, Calvin Boateng, Jair"
 output:
   html_document:
     toc: true
     toc_depth: 3
     toc_float: true
     theme: united
-
 ---
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -39,6 +39,9 @@ suppressWarnings({
 ```
 
 ```{r set path}
+# Set seed for reproducibility
+set.seed(123)
+
 ```
 # Loading in the Data
 
@@ -94,6 +97,33 @@ data %>%
   coord_flip() +
   labs(title = "Top 10 Genres by Average Popularity",
        x = "Genre", y = "Average Popularity")
+
+```
+
+``` {r plot}
+
+library(GGally)
+library(dplyr)
+
+
+numeric_columns <- data %>%
+  dplyr::select(where(is.numeric)) %>%
+  dplyr::select(-any_of("ID"))
+
+# Plot de heatmap zonder labels
+ggcorr(
+  numeric_columns, 
+  label = FALSE,            
+  layout.exp = 1,
+  low = "#7FFF7F",          # groen voor lage correlatie
+  mid = "white", 
+  high = "#FF4C4C",         # rood voor hoge correlatie
+  name = "Correlatie"
+) +
+  labs(
+    title = "Correlatie tussen numerieke variabelen",
+    caption = "Rood = sterke correlatie, Groen = zwak of geen correlatie"
+  )
 
 ```
 
@@ -234,5 +264,33 @@ pred_set(1, pred_names_y, "Popularity", data_train, data_valid)
 pred_set(2, pred_names_y, "Popularity", data_train, data_valid)
 pred_set(3, pred_names_y, "Popularity", data_train, data_valid)
 pred_set(4, pred_names_y, "Popularity", data_train, data_valid)
+
+```
+
+``` {r}
+library(glmnet)
+
+# Prepare model matrices
+x <- model.matrix(Popularity ~ . - Index - Title - Artist - Top.Genre, data_train)[, -1]
+y <- data_train$Popularity
+
+x_valid <- model.matrix(Popularity ~ . - Index - Title - Artist - Top.Genre, data_valid)[, -1]
+y_valid <- data_valid$Popularity
+
+# Lasso Regression with cross-validation
+cv_lasso <- cv.glmnet(x, y, alpha = 1)
+best_lambda <- cv_lasso$lambda.min
+
+# Fit final model
+lasso_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+
+# Predict on validation data
+pred_valid <- predict(lasso_model, s = best_lambda, newx = x_valid)
+
+# Compute validation MSE
+lasso_mse <- mean((y_valid - pred_valid)^2)
+lasso_mse
+
+coef(lasso_model)
 
 ```
