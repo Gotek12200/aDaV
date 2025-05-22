@@ -1,5 +1,5 @@
 ---
-title: "Assignment 1"
+title: "Which audio features best predict a song’s popularity on Spotify?"
 author: "Osaro Orebor, Calvin Boateng, Jair"
 output:
   html_document:
@@ -13,6 +13,11 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+Our Research question is: Which audio features best predict a song’s popularity on Spotify?
+
+We aimed to explore whether certain musical characteristics—such as danceability, loudness, speechiness, and year of release—have a significant effect on a song's popularity. We also compared different modeling approaches (linear regression and Lasso regression) to identify which predictors are most useful and how well these models perform.
+
 
 # Setting Libraries
 
@@ -294,3 +299,16 @@ lasso_mse
 coef(lasso_model)
 
 ```
+
+### Conclusion
+Lasso regression helped identify a small set of audio features that most strongly influence a song’s popularity on Spotify. In particular, loudness and speechiness were strong positive predictors, while energy and year had negative effects. Suggesting nostalgia might be a reason for popularity.
+
+This could mean that songs with lyrics, higher volume levels, and moderate danceability tend to be more popular. Traditional features like BPM or valence were less useful in predicting popularity in this dataset.
+
+
+### Contribution 
+
+Osaro:
+Calvin:
+
+
