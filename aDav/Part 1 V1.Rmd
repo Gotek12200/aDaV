@@ -87,3 +87,15 @@ data <- data %>%
   mutate(Length..Duration. = as.integer(Length..Duration.))
 str(data)
 ```
+
+# Plots
+
+## Plot 1
+
+## Plot 2
+
+## Plot 3 
+
+# Conclusion
+
+# Contribution
