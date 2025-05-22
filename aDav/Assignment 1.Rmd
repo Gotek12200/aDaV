@@ -1,5 +1,5 @@
 ---
-title: "Which audio features best predict a song’s popularity on Spotify?"
+title: "Assignment 1"
 author: "Osaro Orebor, Calvin Boateng, Jair"
 output:
   html_document:
@@ -13,11 +13,6 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
-Our Research question is: Which audio features best predict a song’s popularity on Spotify?
-
-We aimed to explore whether certain musical characteristics—such as danceability, loudness, speechiness, and year of release—have a significant effect on a song's popularity. We also compared different modeling approaches (linear regression and Lasso regression) to identify which predictors are most useful and how well these models perform.
-
 
 # Setting Libraries
 
@@ -105,7 +100,7 @@ data %>%
 
 ```
 
-``` {r plot}
+``` {r plot2}
 
 library(GGally)
 library(dplyr)
@@ -300,15 +295,44 @@ coef(lasso_model)
 
 ```
 
-### Conclusion
-Lasso regression helped identify a small set of audio features that most strongly influence a song’s popularity on Spotify. In particular, loudness and speechiness were strong positive predictors, while energy and year had negative effects. Suggesting nostalgia might be a reason for popularity.
+``` {r}
+#Split correlation plots on top 10 genres, might need facet wrap.
+top_genres <- data %>%
+  group_by(Top.Genre) %>%
+  summarise(Count = n()) %>%
+  filter(Count > 50) %>%
+  pull(Top.Genre)
 
-This could mean that songs with lyrics, higher volume levels, and moderate danceability tend to be more popular. Traditional features like BPM or valence were less useful in predicting popularity in this dataset.
+for (genre in top_genres) {
+  p <- data %>%
+    filter(Top.Genre == genre) %>%
+    dplyr::select(where(is.numeric), -Index) %>%
+    ggcorr(
+      label = FALSE,
+      low = "#7FFF7F",
+      mid = "white",
+      high = "#FF4C4C",
+      name = "Correlatie"
+    ) +
+    labs(title = paste("Correlatie voor", genre),
+         caption = "Rood = sterke correlatie, Groen = zwak of geen correlatie") 
+  print(p)
+}
+```
 
+``` {r}
+data_long <- data %>%
+  dplyr::select(Year, Danceability, Energy, Loudness..dB., Popularity) %>%
+  pivot_longer(cols = c(Danceability, Energy, Loudness..dB., Popularity),
+               names_to = "Feature",
+               values_to = "Value") %>%
+  group_by(Year, Feature) %>%
+  summarise(Avg_Value = mean(Value, na.rm = TRUE), .groups = "drop")
 
-### Contribution 
-
-Osaro:
-Calvin:
-
-
+ggplot(data_long, aes(x = Year, y = Avg_Value, color = Feature)) +
+  geom_line(size = 1) +
+  labs(title = "Trends of some musical features and popularity over time",
+       x = "Year",
+       y = "Average Value") +
+  theme_minimal()
+```
