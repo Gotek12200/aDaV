@@ -2935,7 +2935,6 @@ ggplot(data_long, aes(x = Year, y = Avg_Value, color = Feature)) +
 <div id="distinguishing-the-dataset" class="section level2">
 <h2>Distinguishing the Dataset</h2>
 <pre class="r"><code># 70% train, 15% validation, 15% test
-set.seed(123)
 n &lt;- nrow(data)
 train_index &lt;- sample(1:n, size = 0.7 * n)
 remaining &lt;- setdiff(1:n, train_index)
@@ -2986,20 +2985,6 @@ pred_valid &lt;- predict(lasso_model, s = best_lambda, newx = x_valid)
 lasso_mse &lt;- mean((y_valid - pred_valid)^2)
 lasso_mse</code></pre>
 <pre><code>## [1] 190.2347</code></pre>
-<pre class="r"><code>coef(lasso_model)</code></pre>
-<pre><code>## 11 x 1 sparse Matrix of class &quot;dgCMatrix&quot;
-##                                   s0
-## (Intercept)            565.187538217
-## Year                    -0.246984986
-## Beats.Per.Minute..BPM.   0.011639152
-## Energy                  -0.127626460
-## Danceability             0.148068557
-## Loudness..dB.            1.414333088
-## Liveness                -0.107142896
-## Valence                 -0.025420589
-## Length..Duration.       -0.002589912
-## Acousticness            -0.032592113
-## Speechiness              0.437039233</code></pre>
 <pre class="r"><code># Extract coefficients from Lasso model
 lasso_coef &lt;- coef(lasso_model)
 
@@ -3128,6 +3113,20 @@ Length..Duration.
 </div>
 <div id="conclusion" class="section level1">
 <h1>Conclusion</h1>
+<p>In this analysis, we looked at which audio features help predict how
+popular a song is on Spotify. We used both linear regression and Lasso
+regression to find out which characteristics matter most. The Lasso
+model gave us clearer results by picking out the most important
+features. These included loudness, speechiness, year, danceability,
+energy, and a few others. Loudness had the biggest positive effect,
+meaning louder songs tend to be more popular. Speechiness and
+danceability also had positive impacts, while features like energy and
+liveness had smaller negative effects. Interestingly, the year had a
+negative relationship, which might suggest older songs are more popular
+in this dataset. The Lasso model also had a lower error than the regular
+linear model, showing it performed better. Overall, we found that a
+song’s energy, lyrics, and rhythm play a big role in how popular it
+becomes.</p>
 </div>
 <div id="contribution" class="section level1">
 <h1>Contribution</h1>
