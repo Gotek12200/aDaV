@@ -41,6 +41,7 @@ suppressWarnings({
   library(pROC)
   library(caret)
   library(car)
+  library(glmnet)
 })
 ```
 
@@ -135,9 +136,88 @@ ggplot(data_long, aes(x = Year, y = Avg_Value, color = Feature)) +
 
 # Regression
 
+
+## Distinguishing the Dataset
+
+``` {r}
+# 70% train, 15% validation, 15% test
+n <- nrow(data)
+train_index <- sample(1:n, size = 0.7 * n)
+remaining <- setdiff(1:n, train_index)
+valid_index <- sample(remaining, size = 0.5 * length(remaining))
+test_index <- setdiff(remaining, valid_index)
+
+data_train <- data[train_index, ]
+data_valid <- data[valid_index, ]
+data_test  <- data[test_index, ]
+
+
+# Combine the datasets, adding a column to distinguish them
+combined_data <- bind_rows(
+  mutate(data_train, Set = "Training"),
+  mutate(data_valid, Set = "Validation"),
+  mutate(data_test, Set = "Test")
+)
+
+# Checking if the distribution of popularity is similar in the three datasets
+ggplot(combined_data, aes(x = Popularity, colour = Set)) +
+  geom_density(trim = T, linewidth = 1) +
+  labs(title = "Popularity Distribution Across Datasets",
+       x = "Popularity",
+       y = "Frequency") +
+  theme_minimal()
+```
+
 ## Lasso-Regression
 
+``` {r}
+
+
+# Prepare model matrices
+x <- model.matrix(Popularity ~ . - Index - Title - Artist - Top.Genre, data_train)[, -1]
+y <- data_train$Popularity
+
+x_valid <- model.matrix(Popularity ~ . - Index - Title - Artist - Top.Genre, data_valid)[, -1]
+y_valid <- data_valid$Popularity
+
+# Lasso Regression with cross-validation
+cv_lasso <- cv.glmnet(x, y, alpha = 1)
+best_lambda <- cv_lasso$lambda.min
+
+# Fit final model
+lasso_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+
+# Predict on validation data
+pred_valid <- predict(lasso_model, s = best_lambda, newx = x_valid)
+
+# Compute validation MSE
+lasso_mse <- mean((y_valid - pred_valid)^2)
+lasso_mse
+
+
+
+# Extract coefficients from Lasso model
+lasso_coef <- coef(lasso_model)
+
+# Convert to data frame
+lasso_coef_df <- as.data.frame(as.matrix(lasso_coef))
+colnames(lasso_coef_df) <- "Coefficient"
+
+# feature names
+lasso_coef_df <- lasso_coef_df %>%
+  rownames_to_column(var = "Feature") %>%
+  filter(Coefficient != 0) %>%
+  arrange(desc(abs(Coefficient)))
+
+# table
+kable(lasso_coef_df, caption = "Significant Predictors") %>%
+  kable_styling("striped", full_width = F) %>%
+  scroll_box(width = "600px", height = "400px")
+
+```
+
 # Conclusion
+In this analysis, we looked at which audio features help predict how popular a song is on Spotify. We used both linear regression and Lasso regression to find out which characteristics matter most. The Lasso model gave us clearer results by picking out the most important features. These included loudness, speechiness, year, danceability, energy, and a few others. Loudness had the biggest positive effect, meaning louder songs tend to be more popular. Speechiness and danceability also had positive impacts, while features like energy and liveness had smaller negative effects. Interestingly, the year had a negative relationship, which might suggest older songs are more popular in this dataset. The Lasso model also had a lower error than the regular linear model, showing it performed better. Overall, we found that a song’s energy, lyrics, and rhythm play a big role in how popular it becomes.
 
 # Contribution
 Osaro:
