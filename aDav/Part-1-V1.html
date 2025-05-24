@@ -2854,7 +2854,10 @@ adult standards
 ##  $ Acousticness          : int  94 17 2 0 1 0 6 0 0 0 ...
 ##  $ Speechiness           : int  3 7 17 4 3 2 3 14 8 7 ...
 ##  $ Popularity            : int  71 39 69 76 59 45 74 69 77 82 ...</code></pre>
-<p>##Mutating Data</p>
+</div>
+</div>
+<div id="mutating-data" class="section level2">
+<h2>Mutating Data</h2>
 <pre class="r"><code>#mutate our data so character values become factors
 data &lt;- data %&gt;%
   mutate_if(is.character, as.factor) %&gt;%
@@ -2876,7 +2879,6 @@ str(data)</code></pre>
 ##  $ Acousticness          : int  94 17 2 0 1 0 6 0 0 0 ...
 ##  $ Speechiness           : int  3 7 17 4 3 2 3 14 8 7 ...
 ##  $ Popularity            : int  71 39 69 76 59 45 74 69 77 82 ...</code></pre>
-</div>
 </div>
 </div>
 <div id="plots" class="section level1">

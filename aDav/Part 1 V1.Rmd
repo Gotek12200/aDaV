@@ -79,7 +79,7 @@ kable(tail(data, 10)) %>%
 str(data)
 ```
 
-##Mutating Data
+## Mutating Data
 
 ``` {r}
 #mutate our data so character values become factors
