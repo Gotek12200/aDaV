@@ -1,7 +1,7 @@
 
 ---
 title: Assignment 1
-author: "Osaro Orebor, Calvin Boateng, Jair"
+author: "Osaro Orebor 1168827, Calvin Boateng, Jair"
 output:
   html_document:
     toc: true
@@ -91,11 +91,55 @@ str(data)
 # Plots
 
 ## Plot 1
+``` {r Heatmap}
+numeric_columns <- data %>%
+  dplyr::select(where(is.numeric)) %>%
+  dplyr::select(-any_of("ID"))
+
+# Plot de heatmap 
+ggcorr(
+  numeric_columns, 
+  label = FALSE,            
+  layout.exp = 1,
+  low = "#7FFF7F",          # groen voor lage correlatie
+  mid = "white", 
+  high = "#FF4C4C",         # rood voor hoge correlatie
+  name = "Correlatie"
+) +
+  labs(
+    title = "Correlatie tussen numerieke variabelen",
+    caption = "Rood = sterke correlatie, Groen = zwak of geen correlatie"
+  )
+
+```
 
 ## Plot 2
+``` {r}
+data_long <- data %>%
+  dplyr::select(Year, Danceability, Energy, Loudness..dB., Popularity) %>%
+  pivot_longer(cols = c(Danceability, Energy, Loudness..dB., Popularity),
+               names_to = "Feature",
+               values_to = "Value") %>%
+  group_by(Year, Feature) %>%
+  summarise(Avg_Value = mean(Value, na.rm = TRUE), .groups = "drop")
+
+ggplot(data_long, aes(x = Year, y = Avg_Value, color = Feature)) +
+  geom_line(size = 1) +
+  labs(title = "Trends of some musical features and popularity over time",
+       x = "Year",
+       y = "Average Value") +
+  theme_minimal()
+```
 
 ## Plot 3 
+
+# Regression
+
+## Lasso-Regression
 
 # Conclusion
 
 # Contribution
+Osaro:
+Calvin:
+Jair:
