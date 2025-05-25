@@ -1,7 +1,7 @@
 
 ---
 title: Assignment 1
-author: "Osaro Orebor 1168827, Calvin Boateng, Jair"
+author: "Osaro Orebor (1168827), Calvin Boateng, Mila-Jair Berdenis van Berlekom (6805027)"
 output:
   html_document:
     toc: true

@@ -1,0 +1,345 @@
+
+---
+title: Group assignment - part 1
+
+author: "Osaro Orebor (1168827), Calvin Boateng (1983881), Mila-Jair Berdenis van Berlekom (6805027)"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    fig_width: 12
+    code_folding: hide
+    theme: united
+---
+
+```{r setup1, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r Libraries2, message = FALSE, warning = FALSE}
+# Loading Libraries
+suppressWarnings({
+  library(dplyr)
+  library(ggplot2)
+  library(ggpubr)
+  library(kableExtra)
+  library(tidyverse)
+  library(readr)
+  library(knitr)
+  library(weathermetrics)
+  library(gridExtra)
+  library(plotly)
+  library(GGally)
+  library(magrittr)
+  library(regclass)
+  library(MASS)
+  library(pROC)
+  library(caret)
+  library(car)
+  library(glmnet)
+})
+
+# Set Seed for Reproducibility
+set.seed(123)
+```
+# Chosen Dataset
+
+For our Group Assignment, we decided to choose the "Spotify - Top 2000" dataset.
+
+The dataset, retrieved from [Kaggle](https://www.kaggle.com/iamsumat/spotify-top-2000s-mega-dataset), contains the audio statistics from the "Top 2000s" playlist by [PlaylistMachinery](http://www.playlistmachinery.com/), based on Spotify's own metrics (as of 2019) extracted via the Spotify API. The dataset includes the following variables:
+
+```{r Dataset Variables}
+Description <- c(
+  "Track Identifier",
+  "Name of the Track",
+  "Name of the Artist",
+  "Genre of the track",
+  "Release Year of the track",
+  "The tempo of the song in Beats per Minute",
+  "The energy of a song - the higher the value, the more energtic the song",
+  "The higher the value, the easier it is to dance to this song.",
+  "The higher the value, the more likely the song is a live recording",
+  "Loudness in \"decibels Full Scale\". The higher the value, the louder the song.",
+  "The higher the value, the more positive mood for the song.",
+  "The duration of the song in seconds.",
+  "The higher the value the more acoustic the song is.",
+  "The higher the value the more spoken words the song contains",
+  "The higher the value the more popular the song is.")
+
+Variable <- c("ID", "Title", "Artist", "Genre", "Year", "BPM", "Energy", 
+              "Danceability", "Loudness", "Liveness", "Valence", "Duration",
+              "Acousticness", "Speechiness", "Popularity")
+
+codebook <- data.frame(Variable, Description)
+
+kable(codebook, caption = "Spotify \"Top 2000s\" Dataset Variables") %>% 
+  kable_styling("striped", full_width = F)
+```
+
+Our aim is to explore whether certain musical characteristics have a significant effect on a song's popularity.
+
+# Data Preparation
+
+## Variable names
+Certain variable names are changed to be more concise.
+```{r Loading Data & Variable Names}
+# Loading data
+data <- read.csv("data/Spotify-2000.csv") %>%
+  # Renaming certain variables
+  rename(c(Duration = Length..Duration., BPM = Beats.Per.Minute..BPM., Loudness = Loudness..dB., Genre = Top.Genre, ID = ï..Index))
+```
+
+## Variable formatting
+"Genre" is stored as a character string. Its type is changed to factor, to properly treat it as categorical.
+
+"Duration" (in seconds) is stored as a character string. Its type is changed to integer, to properly treat it as numeric.
+```{r Data preparation}
+# Changing variable types
+data <- data %>%
+  mutate(Genre = as.factor(Genre)) %>%
+  mutate(Duration = as.integer(gsub(",", "", Duration)))
+```
+
+## Outliers and Missing Data
+The Dataset was cleaned before publication on Kaggle, meaning no outliers or missing values should be present.
+
+
+# Initial Exploration
+
+## Inspecting Data Structure and Descriptives
+To verify the data was loaded in correctly, the first and last 10 rows are displayed for an overview of the content. 
+
+Additionally, we compute basic data descriptives to quickly inspect the distribution of each variable.
+
+```{r Descriptives}
+data %>%
+  rename(c(Dance = Danceability, Loud =	Loudness, Live = Liveness, Acoustic = Acousticness, Speech = Speechiness, Popular = Popularity)) %>%
+  head(10) %>%
+  kable() %>% 
+  kable_styling("striped", full_width = F)
+
+data %>%
+  rename(c(Dance = Danceability, Loud =	Loudness, Live = Liveness, Acoustic = Acousticness, Speech = Speechiness, Popular = Popularity)) %>%
+  tail(10) %>%
+  kable() %>% 
+  kable_styling("striped", full_width = F)
+
+psych::describe(data[5:ncol(data)]) %>%
+  dplyr::select(mean, sd, median, min, max, skew, kurtosis) %>%
+  round(3) %>%
+  kable() %>% 
+  kable_styling("striped", full_width = F)
+```
+
+## Plots
+
+### Plot 1 - Correlation Matrix
+We create a correlation "heatmap" to visualize relationships among all numeric variables. The heatmap uses a color gradient to show the strength of the  correlations. 
+
+It helps us identify which audio features are strongly correlated with popularity and also whether multicollinearity may impact final model predictions.
+
+``` {r Plot1}
+# Plotting heatmap using ggcorr, storing in object
+corplot <- ggcorr(
+  data[5:ncol(data)], 
+  label = F,            
+  layout.exp = 1,
+  low = "#7F7FFF",          # blue for negative
+  mid = "#EFEFEF", 
+  high = "#FF4C4C",         # red for positive
+  name = "Correlation"
+  ) +
+  labs(
+    title = "Correlation matrix of numerical variables",
+    caption = "Red = Positive, Blue = Negative"
+    )
+
+# Adjusting labels to prevent overlap
+corplot$layers[[2]]$aes_params$hjust <- 0.9
+
+# Display plot
+corplot
+```
+
+### Interpretation of Plot 1
+It appears that Year and Liveness have a slight negative correlation with popularity. This means that modern tracks and live recordings are less favored.
+
+Loudness, Danceability, Energy, Speechiness and Valence have a slight positive correlation with popularity. Loud, happy, high-energy dance tracks with vocals do seem like a good recipe for a hit at face value.
+
+
+### Plot 2 - Feature Average by Release Year
+We calculate the average values of Danceability, Energy, Loudness, and Popularity by release year. A line plot is used to visualize the trends and it allows us to explore how these features vary with tracks of different ages, comparing classics with modern tracks.
+
+``` {r Plot2}
+data_plot_1 <- data[5:ncol(data)] %>%
+  mutate(across(c("Danceability", "Loudness", "Energy", "Popularity"),
+                ~ as.vector(scale(.x, center = T, scale = T)))) %>%
+  pivot_longer(cols = c(Danceability, Loudness, Energy, Popularity),
+               names_to = "Feature",
+               values_to = "Value") %>%
+  group_by(Year, Feature) %>%
+  summarise(Avg_Value = mean(Value, na.rm = TRUE), .groups = "drop")
+
+
+ggplot(data_plot_1, aes(x = Year, y = Avg_Value, color = Feature, fill = Feature)) +
+  geom_smooth(linewidth = 1.2, alpha = 0.15, ) +
+  scale_color_brewer(palette="Dark2", aesthetics = c("colour", "fill")) +
+  labs(title = "Trends of Musical Features by Release Year",
+       x = "Year",
+       y = "Average across tracks that year, Scaled and Centered",
+       caption = "Loess smoothing applied") +
+  theme_minimal()
+```
+
+### Interpretation of Plot 2
+Popularity is trending down with Release Year, aligning with our observations from the correlation matrix. Especially tracks from before the 1980's appear to be popular despite their low Danceability, Energy and Loudness ratings.
+
+Danceability, Energy and Loudness appear to have become more prevalent over time.
+
+The confidence interval for these trends is quite wide, there is a lot of variance in these values from year to year, so these trends should be taken with some scrutiny.
+
+### Plot 3 - Feature Average by Popularity Rating
+Similar to Plot 2, we calculate the average values of Danceability, Energy and Loudness, but this time by Popularity rating. This will allows us to explore what Features tend to have high values in the least and most popular tracks.
+
+``` {r Plot3}
+data_plot_2 <- data[5:ncol(data)] %>%
+  mutate(across(c("Danceability", "Loudness", "Energy"),
+                ~ as.vector(scale(.x, center = T, scale = T)))) %>%
+  pivot_longer(cols = c(Danceability, Loudness, Energy),
+               names_to = "Feature",
+               values_to = "Value") %>%
+  group_by(Popularity, Feature) %>%
+  summarise(Avg_Value = mean(Value, na.rm = TRUE), .groups = "drop")
+
+
+ggplot(data_plot_2, aes(x = Popularity, y = Avg_Value, color = Feature, fill = Feature)) +
+  geom_smooth(linewidth = 1.2, alpha = 0.15, ) +
+  scale_color_brewer(palette="Dark2", aesthetics = c("colour", "fill")) +
+  labs(title = "Trends of Musical Features by Popularity",
+       x = "Popularity Rating",
+       y = "Average across tracks with similar popularity - 
+       Scaled and Centered",
+       caption = "Loess smoothing applied") +
+  theme_minimal()
+```
+
+### Interpretation of Plot 3
+There is a lot of overlap in the 25-75 range of Popularity Rating. There is a clear upwards trend for these Features, though Energy appears to trend down in the most higly rated tracks.
+
+# Research question and Hypothesis
+
+Based on our data exploration, we formulate the following research question:
+Which audio features best predict a song’s popularity on Spotify?
+
+We predict that Danceability and Loudness will be among the most important features for predicting Popularity.
+
+# Modelling the data
+
+## Data partitioning
+We split the dataset into training (70%), validation (15%), and test (15%) sets. We then plot the density of popularity scores across all sets within a single plot to ensure similar distributions. The data partitioning prepares the data for model training and evaluation, while the density plot confirms that the splits are balanced to ensure that model performance metrics are reliable.
+
+``` {r Data Partition}
+# 70% train, 15% validation, 15% test
+n <- nrow(data)
+train_index <- sample(1:n, size = 0.7 * n)
+remaining <- setdiff(1:n, train_index)
+valid_index <- sample(remaining, size = 0.5 * length(remaining))
+test_index <- setdiff(remaining, valid_index)
+
+data_train <- data[train_index, ]
+data_valid <- data[valid_index, ]
+data_test  <- data[test_index, ]
+
+
+# Combine the datasets, adding a column to distinguish them
+combined_data <- bind_rows(
+  mutate(data_train, Set = "Training"),
+  mutate(data_valid, Set = "Validation"),
+  mutate(data_test, Set = "Test")
+)
+
+# Checking if the distribution of popularity is similar in the three datasets
+ggplot(combined_data, aes(x = Popularity, colour = Set)) +
+  geom_density(trim = T, linewidth = 1.2) +
+  scale_color_brewer(palette="Dark2") +
+  labs(title = "Popularity Distribution Across Datasets",
+       x = "Popularity",
+       y = "Density") +
+  theme_minimal()
+```
+
+## Lasso-Regression
+We perform Lasso regression to identify the most predictive feature for popularity. 
+
+It is ideal for our purpose, as it sets insignificant feature coefficients to zero, resulting in a model that showcases the most predictive features. 
+
+The matrices are prepared by excluding any non-numeric columns and cross-validation then finds the optimal lambda to use for fitting the final model. 
+
+We have this model make predictions on the validation set and compute the mean squared error to evaluate its performance. 
+
+The model’s coefficients are displayed in a table, which showcases all the significant predictors when determining a song's popularity.
+
+``` {r Lasso-Regression}
+
+
+# Prepare model matrices
+x <- model.matrix(Popularity ~ . - ID - Title - Artist - Genre, data_train)[, -1]
+y <- data_train$Popularity
+
+x_valid <- model.matrix(Popularity ~ . - ID - Title - Artist - Genre, data_valid)[, -1]
+y_valid <- data_valid$Popularity
+
+# Lasso Regression with cross-validation
+cv_lasso <- cv.glmnet(x, y, alpha = 1)
+best_lambda <- cv_lasso$lambda.min
+
+# Fit final model
+lasso_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+
+# Predict on validation data
+pred_valid <- predict(lasso_model, s = best_lambda, newx = x_valid)
+
+# Compute validation MSE
+lasso_mse <- mean((y_valid - pred_valid)^2)
+lasso_mse
+
+
+
+# Extract coefficients from Lasso model
+lasso_coef <- coef(lasso_model)
+
+# Convert to data frame
+lasso_coef_df <- as.data.frame(as.matrix(lasso_coef))
+colnames(lasso_coef_df) <- "Coefficient"
+
+# feature names
+lasso_coef_df <- lasso_coef_df %>%
+  rownames_to_column(var = "Feature") %>%
+  filter(Coefficient != 0) %>%
+  arrange(desc(abs(Coefficient)))
+
+# table
+kable(lasso_coef_df, caption = "Significant Predictors") %>%
+  kable_styling("striped", full_width = F) %>%
+  scroll_box(width = "600px", height = "400px")
+
+```
+
+# Conclusion
+In this analysis, we looked at which audio features help predict how popular a song is on Spotify. We used the Lasso regression to find out which characteristics matter most. 
+
+The Lasso model gave us clearer results by picking out the most important features. These included loudness, speechiness, year, danceability, energy, and a few others. 
+
+Loudness had the biggest positive effect, meaning louder songs tend to be more popular. Speechiness and danceability also had positive impacts, while features like energy and liveness had smaller negative effects. 
+
+Interestingly, the year had a negative relationship, which might suggest older songs are more popular in this dataset. 
+
+Overall, we found that a song’s energy, lyrics, and rhythm play a big role in how popular it becomes.
+
+# Contribution
+Osaro: Created Plot 1, wrote the Research question and conclusion. Wrote the lasso Regression.
+
+Calvin:
+
+Mila: Added codebook and data descriptives. Refined plot 1 and plot 2, created plot 3 and provided interpretation. Created data partition density plot. Corrected some of the legitimization's layout and structure.
