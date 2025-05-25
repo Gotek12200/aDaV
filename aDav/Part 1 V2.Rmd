@@ -86,7 +86,7 @@ Certain variable names are changed to be more concise.
 # Loading data
 data <- read.csv("data/Spotify-2000.csv") %>%
   # Renaming certain variables
-  rename(c(Duration = Length..Duration., BPM = Beats.Per.Minute..BPM., Loudness = Loudness..dB., Genre = Top.Genre, ID = ï..Index))
+  rename(c(Duration = Length..Duration., BPM = Beats.Per.Minute..BPM., Loudness = Loudness..dB., Genre = Top.Genre, ID = Index))
 ```
 
 ## Variable formatting
@@ -339,6 +339,6 @@ Overall, we found that a song’s energy, lyrics, and rhythm play a big role in 
 # Contribution
 Osaro: Created Plot 1, wrote the Research question and conclusion. Wrote the lasso Regression.
 
-Calvin:
+Calvin: Created plot 2, Set up professional styling and report layout.
 
 Mila: Added codebook and data descriptives. Refined plot 1 and plot 2, created plot 3 and provided interpretation. Created data partition density plot. Corrected some of the legitimization's layout and structure.
