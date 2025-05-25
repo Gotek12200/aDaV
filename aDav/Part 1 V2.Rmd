@@ -8,7 +8,6 @@ output:
     toc: true
     toc_depth: 3
     toc_float: true
-    fig_width: 12
     code_folding: hide
     theme: united
 ---
