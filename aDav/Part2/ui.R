@@ -14,12 +14,17 @@ shinyUI(fluidPage(
       
       radioButtons("model_type", "Choose Regression Model:",
                    choices = c("Linear" = "lm", "Lasso" = "lasso"),
-                   selected = "lm")
+                   selected = "lm"),
+      
+      checkboxGroupInput("correlation_features", "Select Features for Correlation Heatmap:",
+                         choices = c("Danceability", "Energy", "Loudness", "Valence", "Acousticness", "Speechiness"),
+                         selected = c("Danceability", "Energy", "Loudness", "Valence", "Acousticness", "Speechiness"))
     ),
     
     mainPanel(
       tabsetPanel(
         tabPanel("Feature Plot", plotOutput("featurePlot")),
+        tabPanel("Correlation Heatmap", plotOutput("correlationPlot")),
         tabPanel("Model Output", plotOutput("modelPlot")),
         tabPanel("Summary", verbatimTextOutput("modelSummary"))
       ),
