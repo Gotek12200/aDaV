@@ -50,7 +50,23 @@ shinyServer(function(input, output) {
   })
   
   ## Preface
-  output$preface <- renderText({paste("placeholder text")})
+  output$preface <- renderUI({
+    tagList(
+      h3("Spotify Popularity Analyzer"),
+      p("This application explores how audio features influence the popularity of a total of 1994 songs listed on Spotify. Our original research question went as follows: ", strong("How do audio features predict song popularity across different genres and years?")),
+      h4("How to Use This App:"),
+      tags$ol(
+        tags$li(HTML("Filter Data: Use the sidebar's \"Release Year Range\" slider to select a time period from 1955 through 2020. The number of tracks included will update dynamically.")),
+        tags$li(HTML("Visualizations:")),
+        tags$ul(
+          tags$li(HTML("<b>Feature Plot</b>: Select an audio feature (e.g., Danceability) to visualize its relationship with popularity via an interactive scatter plot.")),
+          tags$li(HTML("<b>Correlation Heatmap</b>: Choose a genre or view all genres to see correlations between audio features.")),
+          tags$li(HTML("<b>Model Coefficients</b>: Compare Linear or Lasso regression models to see which features most influence popularity.")),
+        ),
+        tags$li(HTML("Model Interpretation: Review detailed explanations of model results, including feature importance and performance metrics. Switch between Linear and Lasso models in the 'Model Coefficients' and 'Model Interpretation' tabs to compare them"))
+      ),
+    )
+  })
   
   # Regression and Lasso Model selection and training 
   modelResult <- reactive({
