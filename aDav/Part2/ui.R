@@ -3,6 +3,9 @@ library(shiny)
 shinyUI(fluidPage(
   titlePanel("Spotify Popularity Analyzer"),
   
+  p("This application explores how different audio features influence the popularity of songs on Spotify.
+    It allows users to visualize relationships, compare regression models, and interpret statistical results interactively."),
+  
   sidebarLayout(
     sidebarPanel(
       selectInput("feature", "Select Feature to Visualize:",

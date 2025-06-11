@@ -4,7 +4,7 @@ library(ggplot2)
 library(glmnet)
 library(ggcorrplot)
 
-# Load data
+# Load and clean dataset
 data <- read.csv("Data/Spotify-2000.csv") %>%
   rename(Duration = Length..Duration., BPM = Beats.Per.Minute..BPM., Loudness = Loudness..dB.,
          Genre = Top.Genre, ID = Index) %>%
@@ -12,12 +12,13 @@ data <- read.csv("Data/Spotify-2000.csv") %>%
 
 shinyServer(function(input, output) {
   
+  # Reactive dataset based on year range input
   filteredData <- reactive({
     req(input$year_range)
     data %>% filter(Year >= input$year_range[1], Year <= input$year_range[2])
   })
   
-  # Interactive scatter plot
+  # Feature vs Popularity scatter plot
   output$featurePlot <- renderPlot({
     df <- filteredData()
     correlation <- cor(df$Popularity, df[[input$feature]])
@@ -33,7 +34,7 @@ shinyServer(function(input, output) {
             plot.caption = element_text(hjust = 0))
   })
   
-  # Run the chosen regression model
+  # Regression model selection and training
   modelResult <- reactive({
     df <- filteredData() %>%
       select(Popularity, Danceability, Energy, Loudness, Valence, Acousticness, Speechiness) %>%
@@ -44,12 +45,12 @@ shinyServer(function(input, output) {
     } else {
       x <- model.matrix(Popularity ~ ., df)[,-1]
       y <- df$Popularity
-      model <- cv.glmnet(x, y, alpha = 1)  # Lasso regression
+      model <- cv.glmnet(x, y, alpha = 1)  # Lasso regression with CV
     }
     model
   })
   
-  # Plot showcasing model coefficients
+  # Regression coefficients visualization
   output$modelPlot <- renderPlot({
     model <- modelResult()
     if (input$model_type == "lm") {
@@ -64,26 +65,27 @@ shinyServer(function(input, output) {
       geom_bar(stat = "identity") +
       coord_flip() +
       labs(title = paste(input$model_type, "Regression Coefficients"),
-           x = "Feature", y = "Coefficient",) +
+           x = "Feature", y = "Coefficient") +
       scale_fill_manual(values = c("red", "blue"), guide = FALSE) +
       theme_minimal() +
       theme(text = element_text(size = 16), 
             plot.title = element_text(hjust = 0.5))
   })
   
-  # Interactive correlation heatmap
+  # Correlation heatmap
   output$correlationPlot <- renderPlot({
     df <- filteredData() %>%
       select(Popularity, input$correlation_features)
     correlation_matrix <- cor(df)
     ggcorrplot::ggcorrplot(correlation_matrix, lab = TRUE, colors = c("#7F7FFF", "#EFEFEF", "#FF4C4C")) +
-      labs(title = "Correlation Heatmap of Selected Features", x = "", y = "",) +
+      labs(title = "Correlation Heatmap of Selected Features", x = "", y = "") +
       theme_minimal() +
       theme(text = element_text(size = 16), 
             plot.title = element_text(hjust = 0.5),
             axis.text.x = element_text(angle = 45, hjust = 1))
   })
   
+  # Model summary output
   output$modelSummary <- renderPrint({
     if (input$model_type == "lm") {
       summary(modelResult())
@@ -92,7 +94,7 @@ shinyServer(function(input, output) {
     }
   })
   
-  # Reactive text for regression model results
+  # Interpretation of model results
   output$interpretation <- renderText({
     if (input$model_type == "lm") {
       r2 <- summary(modelResult())$r.squared
