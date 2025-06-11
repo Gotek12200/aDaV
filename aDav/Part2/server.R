@@ -52,19 +52,36 @@ shinyServer(function(input, output) {
   ## Preface
   output$preface <- renderText({paste("placeholder text")})
   
-  # Regression and Lasso Model selection and training (IF/ELSE based on input)
+  # Regression and Lasso Model selection and training 
   modelResult <- reactive({
-    df <- filteredData()[5:ncol(data)]
-
+    # prepping dataset
+    df_full <- filteredData()
+    
     if (input$model_type == "lm") {
+      # choosing num colomns + Popularity for lm
+      df <- df_full %>%
+        select(Popularity, Danceability, Energy, Loudness, Valence,
+               Acousticness, Speechiness, BPM, Duration)
+      
+      # Fit Linear Model
       model <- lm(Popularity ~ ., data = df)
+      
     } else {
-      x <- model.matrix(Popularity ~ ., df)[,-1]
-      y <- df$Popularity
+      # for lasso: only num columns without popularity 
+      df_x <- df_full %>%
+        select(where(is.numeric)) %>%
+        select(-Popularity)
+      
+      x <- model.matrix(~ ., data = df_x)[, -1]  # verwijder intercept
+      y <- df_full$Popularity
+      
+      # Fit Lasso Model with cross-validation
       model <- cv.glmnet(x, y, alpha = 1)
     }
-    model
+    
+    return(model)
   })
+  
   
   # Plots
   ## Feature vs Popularity scatter plot
