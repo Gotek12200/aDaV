@@ -7,7 +7,7 @@ library(ggcorrplot)
 # Load and clean dataset
 data <- read.csv("Data/Spotify-2000.csv") %>%
   rename(Duration = Length..Duration., BPM = Beats.Per.Minute..BPM., Loudness = Loudness..dB.,
-         Genre = Top.Genre, ID = Index) %>%
+         Genre = Top.Genre, ID = ï..Index) %>%
   mutate(Genre = as.factor(Genre), Duration = as.integer(gsub(",", "", Duration)))
 
 shinyServer(function(input, output) {
