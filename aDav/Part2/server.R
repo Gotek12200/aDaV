@@ -5,14 +5,15 @@ library(glmnet)
 library(ggcorrplot)
 
 # Load and clean dataset
-data <- read.csv("Data/Spotify-2000.csv") %>%
+data <- read.csv("Data/Spotify-2000.csv", fileEncoding = "UTF-8-BOM") %>% #issue with encoding used LLM to help me fix the issue and it got fixed by adding the fileEncoding = "UTF-8-BOM"
   rename(Duration = Length..Duration., 
          BPM = Beats.Per.Minute..BPM., 
          Loudness = Loudness..dB., 
          Genre = Top.Genre, 
-         ID = ï..Index) %>%
+         ID = Index) %>%  # Use Index instead of ï..Index
   mutate(Genre = as.factor(Genre), 
          Duration = as.integer(gsub(",", "", Duration)))
+
 
 shinyServer(function(input, output) {
   
