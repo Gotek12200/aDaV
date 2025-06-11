@@ -1,6 +1,6 @@
 Contributions
 
-Jair (achternaam):
+Mila Berdenis van Berlekom:
 - Added a bunch of comments for clarification
 - Reordered the code sections, the plot generation comes last
 - Fixed some code styling, stick to 80 columns/character
@@ -14,6 +14,11 @@ Jair (achternaam):
 - Correlation matrix/heatmap now only displays lower triangle
 - Added reactive model summary output for LM and Lasso results. I had to use some AI to get it to work the way I wanted to, I'll report this alongside my contributions section
 - separate helper function for the full lm model summary output
+- Updated the preface, outlining methodology and interpretation. done with some AI assistance
+- implemented a data split for out-of-sample performance metrics
+- calculated baseline RMSE for comparison
+- implemented Ridge regression and separate scaled/unscaled linear regression options
+- used recipes package to scale and center variables based on ONLY the training data
 
 Calvin Boateng: 
 - Implemented visualization of regression coefficients using ggplot2 bar charts to interpret model outputs
