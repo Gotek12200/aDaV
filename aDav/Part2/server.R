@@ -1,288 +1,159 @@
 library(shiny)
 library(tidyverse)
-library(ggplot2)
 library(glmnet)
 library(ggcorrplot)
 
-# Load and clean dataset
-data <- read.csv("Data/Spotify-2000.csv", fileEncoding = "UTF-8-BOM") %>% #issue with encoding used LLM to help me fix the issue and it got fixed by adding the fileEncoding = "UTF-8-BOM"
-  rename(Duration = Length..Duration., 
-         BPM = Beats.Per.Minute..BPM., 
-         Loudness = Loudness..dB., 
-         Genre = Top.Genre, 
-         ID = Index) %>%  # Use Index instead of ï..Index
-  mutate(Genre = as.factor(Genre), 
-         Duration = as.integer(gsub(",", "", Duration)))
-
+# Load preprocessed data
+data <- readRDS("Data/spotify_cleaned.rds")
 
 shinyServer(function(input, output) {
-  
-  # Preparations
-  ## Reactive dataset based on year range input
   filteredData <- reactive({
-    req(input$year_range)
     data %>% filter(Year >= input$year_range[1], Year <= input$year_range[2])
   })
   
-  ## Display number of tracks in range
-  output$n_tracks <- renderText({
-    paste(nrow(filteredData()), "tracks included")
-  })
+  output$n_tracks <- renderText({ paste(nrow(filteredData()), "tracks included") })
   
-  ## calculate 10 most common genres within selected year range.
-  ### this will be used for a more interactive correlation matrix
-  ### "All Genres" included as the first option in the dropdown selection menu
   topGenres <- reactive({
-    genre_counts <- filteredData() %>%
-      count(Genre, sort = TRUE) %>%
-      filter(n > 10) %>%
-      slice_head(n = 10) %>%
-      pull(Genre)
-    c("All Genres", as.character(genre_counts))
+    genres <- filteredData() %>% count(Genre, sort = TRUE) %>% filter(n > 10) %>% head(10) %>% pull(Genre)
+    c("All Genres", as.character(genres))
   })
   
-  ## genre selector UI for the correlation matrix dropdown menu
   output$genre_selector_ui <- renderUI({
-    selectInput("genre_filter", 
-                label = "Filter Heatmap by Genre:",
-                choices = topGenres(),
-                selected = "All Genres")
+    selectInput("genre_filter", "Filter Heatmap by Genre:", choices = topGenres(), selected = "All Genres")
   })
   
-  ## Preface
-  output$preface <- renderText({paste("placeholder text")})
+  output$preface <- renderUI({
+    HTML(paste(
+      "<h4>Research Context</h4>",
+      "<p>This dashboard explores the question: <strong>What audio characteristics make a song popular on Spotify?</strong></p>",
+      "<p>Using data from over 2,000 tracks released between 1955 and 2020, we investigate the relationship between audio features (like Danceability, Energy, and Acousticness) and a song's popularity score.</p>",
+      "<h4>Method</h4>",
+      "<p>We apply both <strong>linear regression</strong> and <strong>Lasso regression</strong> to identify important features. Lasso further penalizes weak predictors to encourage sparsity.</p>",
+      "<p>Explore the plots, correlation heatmaps, and model outputs to understand what drives musical success on Spotify.</p>",
+      sep = ""
+    ))
+  })
   
-  # Regression and Lasso Model selection and training 
   modelResult <- reactive({
-    # prepping dataset
     df_full <- filteredData()
     
     if (input$model_type == "lm") {
-      # choosing num colomns + Popularity for lm
-      df <- df_full %>%
-        select(Popularity, Danceability, Energy, Loudness, Valence,
-               Acousticness, Speechiness, BPM, Duration)
-      
-      # Fit Linear Model
+      df <- df_full %>% select(Popularity, Danceability, Energy, Loudness, Valence, Acousticness, Speechiness, BPM, Duration)
       model <- lm(Popularity ~ ., data = df)
-      
     } else {
-      # for lasso: only num columns without popularity 
-      df_x <- df_full %>%
-        select(where(is.numeric)) %>%
-        select(-Popularity)
-      
-      x <- model.matrix(~ ., data = df_x)[, -1]  # verwijder intercept
+      df_x <- df_full %>% select(Danceability, Energy, Loudness, Valence, Acousticness, Speechiness, BPM, Duration)
+      x <- model.matrix(~ ., data = df_x)[, -1]
       y <- df_full$Popularity
-      
-      # Fit Lasso Model with cross-validation
+      set.seed(input$seed)
       model <- cv.glmnet(x, y, alpha = 1)
     }
-    
     return(model)
   })
   
-  
-  # Plots
-  ## Feature vs Popularity scatter plot
   output$featurePlot <- renderPlot({
     df_point <- filteredData()
     correlation <- cor(df_point$Popularity, df_point[[input$feature]])
     ggplot(df_point, aes_string(x = "Popularity", y = input$feature)) +
-      geom_jitter(width = 0.2, height = 0.2, alpha = 0.3) +
-      geom_smooth(method = "loess", color = "blue", se = TRUE) +
+      geom_jitter(alpha = 0.3) +
+      geom_smooth(method = "loess", color = "blue") +
       labs(title = paste("Popularity vs", input$feature),
-           x = "Popularity", y = input$feature,
-           caption = paste("Feature Correlation:", round(correlation, 2))) +
-      theme_minimal() +
-      theme(text = element_text(size = 16), 
-            plot.title = element_text(hjust = 0.5),
-            plot.caption = element_text(hjust = 0))
+           caption = paste("Correlation:", round(correlation, 2))) +
+      theme_minimal()
   })
   
-  ## Regression coefficients visualization for LM/Lasso
   output$modelPlot <- renderPlot({
     model <- modelResult()
-    ### LM
     if (input$model_type == "lm") {
       coefs <- summary(model)$coefficients[-1, 1]
       df_model <- data.frame(Feature = names(coefs), Coefficient = coefs)
-    } 
-    ### Lasso
-    else {
-      coefs <- as.matrix(coef(model, s = "lambda.min"))[-1, 1]
-      df_model <- data.frame(Feature = names(coefs), Coefficient = coefs)
-      df_model <- df_model[df_model$Coefficient != 0, ]
+    } else {
+      lambda_choice <- "lambda.1se"
+      coefs_matrix <- coef(model, s = lambda_choice)
+      coefs <- as.numeric(coefs_matrix[-1])
+      features <- rownames(coefs_matrix)[-1]
+      df_model <- data.frame(Feature = features, Coefficient = coefs)
+      df_model <- df_model[abs(df_model$Coefficient) > 1e-4, ]
     }
-    ### CHECK for empty dataframe if no variables selected by Lasso
-    if(nrow(df_model) == 0) {
-      return(
-        ggplot() + 
-          labs(title = "Lasso Regression selected no features", 
-               x = "", y = "") +
-          theme_minimal()
-      )
-    }
-    ### Generate plot
-    ggplot(df_model, aes(x = reorder(Feature, Coefficient), 
-                   y = Coefficient, 
-                   fill = Coefficient > 0)) +
-      geom_bar(stat = "identity") +
-      coord_flip() +
-      labs(title = paste(input$model_type, "Regression Coefficients"),
-           x = "Feature", y = "Coefficient") +
-      scale_fill_manual(values = c("red", "blue"), guide = F) +
-      theme_minimal() +
-      theme(text = element_text(size = 16), 
-            plot.title = element_text(hjust = 0.5))
-  })
-  
-  ## Correlation heatmap
-  output$correlationPlot <- renderPlot({
-    df_cor <- filteredData()
-    ### Based on selection made in UI
-    if (input$genre_filter != "All Genres") {
-      df_cor <- filteredData() %>% filter(Genre == input$genre_filter)}
-    ### Numeric vars only
-    correlation_matrix <- cor(df_cor[5:ncol(data)])
-    ### dynamic title
-    plot_title <- paste("Correlation Heatmap for", input$genre_filter)
     
-    ### Generate plot
-    ggcorrplot::ggcorrplot(correlation_matrix, 
-                           lab = TRUE, 
-                           colors = c("#7F7FFF", "#EFEFEF", "#FF4C4C"),
-                           type = "lower",
-                           lab_size = 4) +
-      labs(title = plot_title, x = "", y = "") +
-      theme_minimal() +
-      theme(text = element_text(size = 16), 
-            plot.title = element_text(hjust = 0.5),
-            axis.text.x = element_text(angle = 45, hjust = 1))
+    if (nrow(df_model) == 0) {
+      ggplot() + labs(title = "No features selected by Lasso.") + theme_minimal()
+    } else {
+      ggplot(df_model, aes(x = reorder(Feature, Coefficient), y = Coefficient, fill = Coefficient > 0)) +
+        geom_bar(stat = "identity") +
+        coord_flip() +
+        labs(title = paste(input$model_type, "Regression Coefficients")) +
+        theme_minimal() +
+        scale_fill_manual(values = c("red", "blue"), guide = FALSE)
+    }
   })
   
-  # Reactive model interpretation
+  output$correlationPlot <- renderPlot({
+    df_cor <- if (input$genre_filter == "All Genres") filteredData() else filteredData() %>% filter(Genre == input$genre_filter)
+    correlation_matrix <- cor(df_cor %>% select_if(is.numeric))
+    ggcorrplot(correlation_matrix, lab = TRUE, type = "lower", colors = c("blue", "white", "red"))
+  })
+  
   output$modelInterpretation <- renderUI({
     model <- modelResult()
-    
-    if (input$model_type == "lm") { # for lm
-      ## Extract metrics
+    if (input$model_type == "lm") {
       s <- summary(model)
-      r2 <- s$r.squared
-      adj_r2 <- s$adj.r.squared
-      explained <- round(adj_r2 * 100, 2)
-      
-      ## Extract coefficients table
-      coef_table <- as.data.frame(s$coefficients)
-      coef_table <- coef_table[-1, ] # Remove intercept
-      
-      ## Generate a sentence for each predictor 
-      ## (this section was made with the help of AI assistance - Mila)
+      r2 <- s$adj.r.squared * 100
+      coef_table <- as.data.frame(s$coefficients)[-1, ]
       interpretations <- apply(coef_table, 1, function(row) {
         feature_name <- rownames(row)
-        estimate <- as.numeric(row["Estimate"])
-        p_value <- as.numeric(row["Pr(>|t|)"])
-        direction <- ifelse(estimate > 0, "positive", "negative")
-        significance <- ifelse(p_value < 0.05, "statistically significant", 
-                               "not statistically significant")
-        ## (end of section)
-        
-        paste0(
-          "The relationship between ", strong(feature_name), 
-          " and Popularity is ", strong(direction), " and ", 
-          strong(significance), " (p-value = ", round(p_value, 4), ")."
-        )
+        est <- row["Estimate"]
+        p_val <- row["Pr(>|t|)"]
+        direction <- ifelse(est > 0, "positive", "negative")
+        signif <- ifelse(p_val < 0.05, "significant", "not significant")
+        paste0("The relationship between ", strong(feature_name), " and popularity is ", direction, " and ", signif, " (p = ", round(as.numeric(p_val), 4), ").")
       })
       
-      ## Combine everything
       tagList(
-        h3("Linear Regression Model Summary"),
-        tags$ul(tags$li(HTML(paste0(
-          "The model explains about ", strong(explained), 
-          "% of the variance in song popularity (Adjusted R-squared).")))),
-        hr(),
-        h4("Feature-by-Feature Interpretation"),
-        p("This section describes how each audio feature relates to popularity,
-          according to the model:"),
-        ## (this section was made with the help of AI assistance - Mila)
-        tags$ul(
-          lapply(interpretations, function(interp) {
-            tags$li(HTML(interp))
-          })
-          ## (end of section)
-        ),
-        hr(),
+        h4("Model Summary"),
+        p(paste("Adjusted R-squared:", round(r2, 2), "%")),
+        h4("Feature Interpretations"),
+        tags$ul(lapply(interpretations, function(i) tags$li(HTML(i)))),
         h4("Full Model Output"),
-        p("The full statistical summary is provided below:"),
         verbatimTextOutput("lm_full_summary")
       )
       
-    } else { ## For Lasso
-      ## Extract metrics
-      min_mse <- min(model$cvm)
-      min_rmse <- sqrt(min_mse)
-      best_lambda <- model$lambda.min
+    } else {
+      lambda_choice <- "lambda.1se"
+      coefs <- coef(model, s = lambda_choice)
+      selected <- rownames(coefs)[which(abs(coefs) > 1e-4)]
+      selected <- selected[selected != "(Intercept)"]
       
-      ## Get the coefficients for the best lambda
-      active_coefs <- coef(model, s = "lambda.min")
-      ## (this section was made with the help of AI assistance - Mila)
-      selected_features <- active_coefs@Dimnames[[1]][which(active_coefs != 0)]
-      selected_features <- selected_features[selected_features != "(Intercept)"]
-      ## (end of section)
+      rmse <- round(sqrt(min(model$cvm)), 2)
+      mse <- round(min(model$cvm), 2)
+      lambda <- round(model$lambda.1se, 4)
       
       tagList(
-        h3("Lasso Regression Model Summary"),
-        p("Lasso is a regression method that performs both variable 
-          selection and regularization to enhance prediction 
-          accuracy and interpretability."),
-        hr(),
-        
+        h3("Lasso Regression: Model Interpretation"),
+        p("Lasso regression helps us identify only the most important features by penalizing those that contribute little to prediction accuracy."),
+        br(),
         h4("Model Performance"),
-        tags$ul(tags$li(HTML(paste0(
-          "The model's ", 
-          strong("Root Mean Squared Error (RMSE)"), 
-          " is ", 
-          strong(round(min_rmse, 2)), 
-                              
-          ". This means the model's predictions are typically off by about ", 
-          round(min_rmse, 2), " points on the popularity scale (0-100)."))),
-          tags$li(HTML(paste0(
-            "The underlying ", 
-            strong("Mean Squared Error (MSE)"), 
-            " was ", strong(round(min_mse, 2)), "."))),
-          tags$li(HTML(paste0(
-            "This performance was achieved with an optimal lambda 
-            (regularization parameter) of ", 
-            strong(round(best_lambda, 4)), ".")))
+        tags$ul(
+          tags$li(HTML(paste("<strong>Root Mean Squared Error (RMSE):</strong> ", rmse))),
+          tags$li(HTML(paste("<strong>Mean Squared Error (MSE):</strong> ", mse))),
+          tags$li(HTML(paste("<strong>Optimal Lambda:</strong> ", lambda)))
         ),
-        
-        hr(),
-        h4("Feature Selection"),
-        tags$ul(tags$li(HTML(paste0(
-          "Lasso selected ", 
-          strong(length(selected_features)), 
-          " out of", length(active_coefs)-1 ,
-          " available features as being the most important 
-          predictors of popularity:")))),
-        
-        ## (this section was made with the help of AI assistance - Mila)
-        if(length(selected_features) > 0) {
-          tags$ul(lapply(selected_features, tags$li))
-          ## (end of section)
+        br(),
+        h4("Selected Features"),
+        if (length(selected) > 0) {
+          tagList(
+            p("The following features were selected by the model as having the strongest relationship with popularity:"),
+            tags$ul(lapply(selected, function(feat) tags$li(HTML(paste("<strong>", feat, "</strong>")))))
+          )
         } else {
-          p(strong("The model did not select any features, suggesting none 
-                   have a strong, reliable linear relationship with popularity 
-                   within this data slice."))
-        }
+          p("No features were selected. This may indicate that within the selected year range, none of the audio features provide a strong or consistent signal for predicting popularity.")
+        },
+        br(),
+        p(em("Tip: Adjust the year range or seed value to explore how feature importance changes."))
       )
     }
   })
   
-  # lm full model summary output
   output$lm_full_summary <- renderPrint({
-    if(input$model_type == "lm") {
-      summary(modelResult())
-    }
+    if (input$model_type == "lm") summary(modelResult())
   })
-  
 })

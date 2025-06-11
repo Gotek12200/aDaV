@@ -1,0 +1,32 @@
+---
+title: "Support Document"
+date: "2025-06-11"
+---
+# Preprocessing
+
+Here is the preprocessing done for the Shiny-App
+```{r preprocessing}
+
+library(tidyverse)
+
+data <- read.csv("Data/Spotify-2000.csv", fileEncoding = "UTF-8-BOM") %>%
+  rename(
+    Duration = Length..Duration.,
+    BPM = Beats.Per.Minute..BPM.,
+    Loudness = Loudness..dB.,
+    Genre = Top.Genre,
+    ID = Index
+  ) %>%
+  mutate(
+    Genre = as.factor(Genre),
+    Duration = as.integer(gsub(",", "", Duration))
+  )
+
+```
+
+```{r preprocessing}
+
+saveRDS(data, "Data/spotify_cleaned.rds")
+
+```
+

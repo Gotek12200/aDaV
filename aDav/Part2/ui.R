@@ -2,63 +2,53 @@ library(shiny)
 library(shinythemes)
 
 shinyUI(fluidPage(
-  theme = shinytheme("flatly"), # Optional: adds a nice theme
+  theme = shinytheme("flatly"),
   titlePanel("Spotify Popularity Analyzer"),
   
-  p("This application explores how different audio features influence the 
-  popularity of songs on Spotify. It allows users to visualize 
-    relationships, compare regression models, and 
-    interpret statistical results interactively."),
+  p("This interactive application explores how audio features relate to song popularity on Spotify. You can filter songs by release year, compare the effectiveness of linear vs. Lasso regression models, and visualize key patterns through plots and heatmaps. The goal is to uncover what makes a song popular using data science techniques."),
   
   sidebarLayout(
-    sidebarPanel(
-      h4("Global Data Filter"),
-      sliderInput("year_range", "Release Year Range:",
-                  # Min should be 1955
-                  min = 1955, max = 2020, value = c(2000, 2020), step = 1),
-      # Adding a lil div for no of tracks.
-      h5(textOutput("n_tracks")),
-
-      # CONDITIONAL SIDE PANELS (cleann :) )
-      ## Selecting inputs for the feature plot
-      conditionalPanel(
-        condition = "input.main_tabs == 'Feature Plot'",
-        selectInput("feature", "Select Feature to Visualize:",
-                    choices = c("Danceability", "Energy", "Loudness", 
-                                "Valence", "Acousticness", "Speechiness"),
-                    selected = "Danceability")
-      ),
-      
-      ## Selecting inputs for the correlation heatmap
-      conditionalPanel(
-        condition = "input.main_tabs == 'Correlation Heatmap'",
-        # use uiOutput, choices are generated serverside
-        uiOutput("genre_selector_ui") 
-      ),
-      
-      # MODEL TABS
-      ## Using || this panel will appear for both the model coeff histogram tab, 
-      ## and then model interpretation summary tab
-      conditionalPanel(
-        condition = "input.main_tabs == 'Model Coefficients' || 
-        input.main_tabs == 'Model Interpretation'",
-        radioButtons("model_type", "Choose Regression Model:",
-                     choices = c("Linear" = "lm", "Lasso" = "lasso"),
-                     selected = "lm")
+    # Sidebar panel appears ONLY when the tab is not Preface
+    conditionalPanel(
+      condition = "input.main_tabs != 'Preface'",
+      sidebarPanel(
+        h4("Global Data Filter"),
+        sliderInput("year_range", "Release Year Range:", min = 1955, max = 2020, value = c(2000, 2020)),
+        h5(textOutput("n_tracks")),
+        
+        conditionalPanel(
+          condition = "input.main_tabs == 'Feature Plot'",
+          selectInput("feature", "Select Feature to Visualize:",
+                      choices = c("Danceability", "Energy", "Loudness", 
+                                  "Valence", "Acousticness", "Speechiness"))
+        ),
+        
+        conditionalPanel(
+          condition = "input.main_tabs == 'Correlation Heatmap'",
+          uiOutput("genre_selector_ui")
+        ),
+        
+        conditionalPanel(
+          condition = "input.main_tabs == 'Model Coefficients' || input.main_tabs == 'Model Interpretation'",
+          radioButtons("model_type", "Choose Regression Model:",
+                       choices = c("Linear" = "lm", "Lasso" = "lasso")),
+          conditionalPanel(
+            condition = "input.model_type == 'lasso'",
+            numericInput("seed", "Set Random Seed:", value = 123, min = 1, max = 9999),
+            helpText("Change the seed to ensure reproducible results for Lasso regression.")
+          )
+          
+        )
       )
     ),
     
     mainPanel(
-      # We add an id here so the conditionalPanels can see which tab is active.
-      tabsetPanel(
-        id = "main_tabs", 
-        tabPanel("Preface", textOutput("preface")),
-        tabPanel("Feature Plot", plotOutput("featurePlot")),
-        tabPanel("Correlation Heatmap", plotOutput("correlationPlot")),
-        tabPanel("Model Coefficients", plotOutput("modelPlot")),
-        tabPanel("Model Interpretation", 
-                 icon = icon("magnifying-glass-chart"),
-                 uiOutput("modelInterpretation"))
+      tabsetPanel(id = "main_tabs",
+                  tabPanel("Preface", uiOutput("preface")),
+                  tabPanel("Feature Plot", plotOutput("featurePlot")),
+                  tabPanel("Correlation Heatmap", plotOutput("correlationPlot")),
+                  tabPanel("Model Coefficients", plotOutput("modelPlot")),
+                  tabPanel("Model Interpretation", uiOutput("modelInterpretation"))
       )
     )
   )
